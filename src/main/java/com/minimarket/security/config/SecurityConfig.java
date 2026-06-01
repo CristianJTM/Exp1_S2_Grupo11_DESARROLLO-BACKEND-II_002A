@@ -1,63 +1,108 @@
 package com.minimarket.security.config;
 
-import com.minimarket.security.service.CustomUserDetailsService;
+import com.minimarket.security.filter.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-public class    SecurityConfig {
+public class SecurityConfig {
 
-    private final CustomUserDetailsService customUserDetailsService;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    public SecurityConfig(CustomUserDetailsService customUserDetailsService) {
-        this.customUserDetailsService = customUserDetailsService;
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter) {
+
+        this.jwtAuthenticationFilter =
+                jwtAuthenticationFilter;
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(csrf -> csrf.disable()) // Deshabilita CSRF con la nueva sintaxis
-                .authorizeHttpRequests(auth -> auth
-                        // Público
-                        .requestMatchers("/public/**").permitAll()
-                        // GERENTE
-                        .requestMatchers("/api/usuarios/**").hasAuthority("GERENTE")
-                        .requestMatchers("/api/categorias/**").hasAuthority("GERENTE")
-                        // EMPLEADO o GERENTE
-                        .requestMatchers("/api/productos/**").hasAnyAuthority("EMPLEADO", "GERENTE")
-                        .requestMatchers("/api/inventario/**").hasAnyAuthority("EMPLEADO", "GERENTE")
-                        .requestMatchers("/api/ventas/**").hasAnyAuthority("EMPLEADO", "GERENTE")
-                        .requestMatchers("/api/detalle-ventas/**").hasAnyAuthority("EMPLEADO", "GERENTE")
-                        // Todos los roles
-                        .requestMatchers("/api/carrito/**")
-                        .hasAnyAuthority("CLIENTE", "EMPLEADO", "GERENTE")
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http) throws Exception {
+        System.out.println("CONFIG JWT CARGADA");
 
-                        .anyRequest().authenticated()
-                )
-                .formLogin(form -> form
-                        .defaultSuccessUrl("/public/hola", true) // Redirigir después del login
-                )
-                .logout(logout -> logout
-                        .logoutUrl("/logout")
-                        .logoutSuccessUrl("/public/hola")
+        http
+                .csrf(csrf -> csrf.disable())
+
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS))
+
+                .authorizeHttpRequests(auth -> auth
+
+                        .requestMatchers(
+                                "/auth/**",
+                                "/public/**",
+                                "/h2-console/**")
                         .permitAll()
+
+                        .requestMatchers("/api/usuarios/**")
+                        .hasAuthority("GERENTE")
+
+                        .requestMatchers("/api/categorias/**")
+                        .hasAuthority("GERENTE")
+
+                        .requestMatchers("/api/productos/**")
+                        .hasAnyAuthority(
+                                "EMPLEADO",
+                                "GERENTE")
+
+                        .requestMatchers("/api/inventario/**")
+                        .hasAnyAuthority(
+                                "EMPLEADO",
+                                "GERENTE")
+
+                        .requestMatchers("/api/ventas/**")
+                        .hasAnyAuthority(
+                                "EMPLEADO",
+                                "GERENTE")
+
+                        .requestMatchers("/api/detalle-ventas/**")
+                        .hasAnyAuthority(
+                                "EMPLEADO",
+                                "GERENTE")
+
+                        .requestMatchers("/api/carrito/**")
+                        .hasAnyAuthority(
+                                "CLIENTE",
+                                "EMPLEADO",
+                                "GERENTE")
+
+                        .anyRequest()
+                        .authenticated()
+                )
+
+                .headers(headers ->
+                        headers.frameOptions(
+                                frame -> frame.disable()))
+
+                .addFilterBefore(
+                        jwtAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class
                 );
+
         return http.build();
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config)
+            throws Exception {
+
+        return config.getAuthenticationManager();
     }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(); // Configuración de encriptación de contraseñas
+
+        return new BCryptPasswordEncoder();
     }
 }
